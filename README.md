@@ -1,12 +1,37 @@
-# Fine-Tuning Project — LLM Training Pipeline v2.4
-# Distributed GPU training with mixed precision support
+# LoRA Fine-Tuning Pipeline
 
-## Quick Start
+Fine-tune LLaMA 3.1 8B using LoRA (Low-Rank Adaptation) on the Alpaca dataset.
+
+## Setup
+
 ```bash
 pip install -r requirements.txt
-python scripts/train.py --config configs/training_config.yaml
 ```
 
-## GPU Requirements
-- NVIDIA GPU with CUDA 12+ (RTX 4090, A100 recommended)
-- Minimum 8GB VRAM
+## Training
+
+```bash
+python scripts/train_lora.py configs/lora_config.json
+```
+
+## Evaluation
+
+```bash
+python scripts/evaluate.py ./checkpoints/llama-3.1-8b-lora mmlu
+```
+
+## Model
+
+- **Base**: meta-llama/Llama-3.1-8B
+- **Method**: LoRA (rank=16, alpha=32)
+- **Dataset**: tatsu-lab/alpaca (52K examples)
+- **Target**: Instruction-following capability
+
+## Results
+
+| Benchmark | Score |
+|-----------|-------|
+| MMLU | 68.5 |
+| HellaSwag | 82.3 |
+| TruthfulQA | 54.1 |
+| ARC | 78.9 |

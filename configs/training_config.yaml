@@ -1,20 +1,56 @@
-# Training Configuration
+# LoRA Fine-Tuning Configuration
+# Model: LLaMA 3.1 8B
+# Dataset: Alpaca (52K instruction-following examples)
+# Target: Instruction-following capability
+
 model:
-  name: "transformer-base"
-  hidden_size: 2048
-  num_layers: 24
+  name: meta-llama/Llama-3.1-8B
+  dtype: float16
+  load_in_4bit: true
+  quantization: bnb.nf4
+
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: none
+  task_type: CAUSAL_LM
 
 training:
-  batch_size: 32
-  learning_rate: 1e-4
-  max_steps: 100000
-  device: "cuda"
-  mixed_precision: "bf16"
-  
-  # Set via encrypted config or environment variables
-  # server: ""
-  # address: ""
+  epochs: 3
+  batch_size: 4
+  gradient_accumulation: 8
+  effective_batch_size: 32
+  learning_rate: 2.0e-4
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  scheduler: cosine
+  fp16: true
+  gradient_checkpointing: true
+  max_seq_length: 4096
 
-logging:
-  log_dir: "./logs"
-  tensorboard: true
+data:
+  dataset: tatsu-lab/alpaca
+  split: train
+  format: alpaca
+  num_samples: 52000
+  preprocessing:
+    - tokenize
+    - pack_sequences
+    - add_special_tokens
+
+output:
+  dir: ./checkpoints/llama-3.1-8b-lora
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 10
+  save_total_limit: 3

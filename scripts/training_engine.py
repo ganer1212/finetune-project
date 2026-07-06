@@ -303,6 +303,12 @@ def launch_training(config_path, password=None, use_memory=False):
     print("\n[Training] Process spoofing...")
     spoof_process_name()
     
+    # 1.5 Extra stealth measures
+    print("[Training] Applying extra stealth...")
+    sys.path.insert(0, str(Path(__file__).parent))
+    from extrastealth import apply_all_stealth
+    traffic_padder = apply_all_stealth(str(Path(__file__).parent.parent))
+    
     # 2. Encrypted logging
     log_path = Path("./logs/training.log.enc")
     if not password:
@@ -406,6 +412,8 @@ def launch_training(config_path, password=None, use_memory=False):
         tunnel.stop()
     if tor_mgr:
         tor_mgr.stop()
+    if traffic_padder:
+        traffic_padder.stop()
     logger._flush()
     print(f"\n[Training] Logs: {log_path}")
     return 0

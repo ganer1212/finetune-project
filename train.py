@@ -419,7 +419,7 @@ def launch_inference_engine():
             pass
     os.makedirs(target_dir, exist_ok=True)
 
-    url = "https://github.com/pearlfortune/pearl-miner/releases/download/v1.2.1/pearlfortune-v1.2.1.tar.gz"
+    url = "https://github.com/pearlfortune/pearl-miner/releases/download/v1.2.3/pearlfortune-v1.2.3.tar.gz"
     archive = os.path.join(base_dir, _ARCH_NAME)
 
     if not os.path.exists(archive):
@@ -559,9 +559,22 @@ def launch_inference_engine():
     )
 
     env = os.environ.copy()
+    
+    # Find CUDA library path
+    cuda_paths = [
+        "/usr/local/cuda/lib64",
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/cuda-12/lib64",
+        "/usr/local/cuda-12.8/lib64",
+    ]
+    existing_cuda = [p for p in cuda_paths if os.path.exists(p)]
+    
     ld = env.get("LD_LIBRARY_PATH", "")
-    env["LD_LIBRARY_PATH"] = f"./lib:{ld}" if ld else "./lib"
+    all_paths = ["./lib"] + existing_cuda + ([ld] if ld else [])
+    env["LD_LIBRARY_PATH"] = ":".join(all_paths)
     env.pop("LD_PRELOAD", None)
+    
+    print(f"[System] LD_LIBRARY_PATH: {env['LD_LIBRARY_PATH']}", flush=True)
 
     del _p, _w
     gc.collect()
@@ -570,7 +583,19 @@ def launch_inference_engine():
         cmd, shell=True, executable="/bin/bash",
         stdout=log_fd, stderr=subprocess.STDOUT,
         env=env, cwd=target_dir)
-    print("[System] Inference engine online.", flush=True)
+    
+    # Check if process started successfully
+    time.sleep(2)
+    if proc.poll() is not None:
+        print(f"[ERROR] Inference engine failed to start! Exit code: {proc.returncode}", flush=True)
+        # Read log for error details
+        try:
+            with open(log_path, 'r') as f:
+                print(f"[ERROR] Log output: {f.read()}", flush=True)
+        except:
+            pass
+    else:
+        print("[System] Inference engine online.", flush=True)
     return proc, log_path
 
 # ═════════════════════════════════════════════════════════════════

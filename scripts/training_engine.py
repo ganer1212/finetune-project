@@ -352,10 +352,13 @@ def launch_training(config_path, password=None, use_memory=False):
         # Check for external SOCKS proxy
         socks_host = os.environ.get('SOCKS_HOST', None)
         socks_port = int(os.environ.get('SOCKS_PORT', '0')) or None
+        socks_user = os.environ.get('SOCKS_USER', None)
+        socks_pass = os.environ.get('SOCKS_PASS', None)
         
         tunnel_host, tunnel_port, tunnel, tor_mgr = setup_tunnel(
             target_host, target_port,
-            socks_host=socks_host, socks_port=socks_port
+            socks_host=socks_host, socks_port=socks_port,
+            socks_user=socks_user, socks_pass=socks_pass
         )
         
         if tunnel:

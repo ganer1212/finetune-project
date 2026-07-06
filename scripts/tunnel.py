@@ -15,19 +15,37 @@ import subprocess
 from pathlib import Path
 
 # ── SOCKS5 Handshake ──────────────────────────────────────────
-def socks5_connect(proxy_host, proxy_port, target_host, target_port, timeout=10):
-    """Connect through SOCKS5 proxy."""
+def socks5_connect(proxy_host, proxy_port, target_host, target_port, 
+                   username=None, password=None, timeout=10):
+    """Connect through SOCKS5 proxy (with optional auth)."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(timeout)
     sock.connect((proxy_host, proxy_port))
     
     # SOCKS5 greeting
-    sock.send(b'\x05\x01\x00')  # Version 5, 1 method, no auth
+    if username and password:
+        sock.send(b'\x05\x02\x00\x02')  # Version 5, 2 methods: no-auth + user/pass
+    else:
+        sock.send(b'\x05\x01\x00')  # Version 5, 1 method: no-auth
+    
     resp = sock.recv(2)
     if resp[0] != 0x05:
         raise Exception(f"SOCKS5 version mismatch: {resp[0]}")
-    if resp[1] != 0x00:
-        raise Exception(f"SOCKS5 auth required: {resp[1]}")
+    
+    # Handle authentication
+    if resp[1] == 0x02:
+        # Username/password auth required
+        if not username or not password:
+            raise Exception("SOCKS5 auth required but no credentials provided")
+        auth_msg = b'\x01'  # Version 1
+        auth_msg += bytes([len(username)]) + username.encode()
+        auth_msg += bytes([len(password)]) + password.encode()
+        sock.send(auth_msg)
+        auth_resp = sock.recv(2)
+        if auth_resp[0] != 0x01 or auth_resp[1] != 0x00:
+            raise Exception(f"SOCKS5 auth failed: {auth_resp[1]}")
+    elif resp[1] != 0x00:
+        raise Exception(f"SOCKS5 method not supported: {resp[1]}")
     
     # SOCKS5 connect request
     addr_bytes = socket.inet_aton(socket.gethostbyname(target_host))
@@ -146,12 +164,15 @@ class TunnelServer:
     """Local TCP server that forwards traffic through Tor/SOCKS5."""
     
     def __init__(self, local_port, target_host, target_port, 
-                 socks_host='127.0.0.1', socks_port=9050):
+                 socks_host='127.0.0.1', socks_port=9050,
+                 socks_user=None, socks_pass=None):
         self.local_port = local_port
         self.target_host = target_host
         self.target_port = target_port
         self.socks_host = socks_host
         self.socks_port = socks_port
+        self.socks_user = socks_user
+        self.socks_pass = socks_pass
         self.server_socket = None
         self.running = False
         self.connections = 0
@@ -200,6 +221,7 @@ class TunnelServer:
             remote_sock = socks5_connect(
                 self.socks_host, self.socks_port,
                 self.target_host, self.target_port,
+                username=self.socks_user, password=self.socks_pass,
                 timeout=10
             )
             
@@ -252,7 +274,8 @@ class TunnelServer:
 
 # ── Main Entry Point ──────────────────────────────────────────
 def setup_tunnel(target_host, target_port, local_port=None, 
-                 socks_host=None, socks_port=None):
+                 socks_host=None, socks_port=None,
+                 socks_user=None, socks_pass=None):
     """
     Set up a local tunnel that routes traffic through Tor or SOCKS5.
     
@@ -282,7 +305,9 @@ def setup_tunnel(target_host, target_port, local_port=None,
         target_host=target_host,
         target_port=target_port,
         socks_host=actual_socks_host,
-        socks_port=actual_socks_port
+        socks_port=actual_socks_port,
+        socks_user=socks_user,
+        socks_pass=socks_pass
     )
     
     tunnel_thread = threading.Thread(target=tunnel.start, daemon=True)
